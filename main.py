@@ -191,6 +191,11 @@ def create_aspect_column_figure(side, trump_aspect_sentiment_count_df, trump_asp
 
 
 def configure_aspect_page(df, start, end):
+    def configure_aspect_page_second_half(df):
+        trump_aspect_sentiment_count_df, trump_aspect_sentiment_row_perc_df, kamala_aspect_sentiment_count_df, kamala_aspect_sentiment_row_perc_df = get_sentiment_aggregated_at_aspect_level(df)
+        left, mid, right = st.columns([3, 1, 3])
+        create_aspect_column_figure(left, trump_aspect_sentiment_count_df, trump_aspect_sentiment_row_perc_df, 'Trump')
+        create_aspect_column_figure(right, kamala_aspect_sentiment_count_df, kamala_aspect_sentiment_row_perc_df, 'Kamala')
 
     st.markdown('<h2 style="text-align: center;">Aspect Level ABSA Results</h2>', unsafe_allow_html=True)
     st.header("Filters")
@@ -208,12 +213,19 @@ def configure_aspect_page(df, start, end):
     
     
     if filter_left.button('Apply Filters'):
-        pass
+
+        filtered_df = df[
+            (df['post_timestamp'] >= pd.to_datetime(filter_start_date)) &
+            (df['post_timestamp'] <= pd.to_datetime(filter_end_date)) &
+            (df['platform'].isin(filter_platform)) & 
+            (df['final_aspect_categories'].isin(filter_aspect)) 
+        ]
+
+        configure_aspect_page_second_half(filtered_df)
+        
+
     else:
-        trump_aspect_sentiment_count_df, trump_aspect_sentiment_row_perc_df, kamala_aspect_sentiment_count_df, kamala_aspect_sentiment_row_perc_df = get_sentiment_aggregated_at_aspect_level(df)
-        left, mid, right = st.columns([3, 1, 3])
-        create_aspect_column_figure(left, trump_aspect_sentiment_count_df, trump_aspect_sentiment_row_perc_df, 'Trump')
-        create_aspect_column_figure(right, kamala_aspect_sentiment_count_df, kamala_aspect_sentiment_row_perc_df, 'Kamala')
+        configure_aspect_page_second_half(df)
 
 
 
