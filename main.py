@@ -16,8 +16,10 @@ def get_data():
         df = pd.concat([df, temp_df])
 
     df['final_sentiment_prediction_label'] = df['final_sentiment_prediction'].replace({-1:'negative', 0:'neutral', 1:'positive'})
-    df = df[['platform', 'level', 'sentence_idx', 'post_timestamp', 'comment', 'comment_id', 'sentence', 'entity_category', 'final_aspect_categories', 'final_sentiment_prediction']]
-    df['post_timestamp'] = pd.to_datetime(df['post_timestamp'], format='%Y-%m-%d')
+    df = df[['platform', 'level', 'sentence_idx', 'comment_timestamp', 'comment', 'comment_id', 'sentence', 'entity_category', 'final_aspect_categories', 'final_sentiment_prediction']]
+    df['comment_timestamp'] = pd.to_datetime(df['comment_timestamp'], format='%Y-%m-%d')
+    df['comment_timestamp_week_sun'] = df['comment_timestamp'] + pd.offsets.Week(weekday=6)
+
     return df
 
 # ENTITY LEVEL
@@ -109,8 +111,8 @@ def configure_overall_entity_page(df, start, end):
 
     if filter_left.button('Apply Filters'):
         filtered_df = df[
-            (df['post_timestamp'] >= pd.to_datetime(filter_start_date)) &
-            (df['post_timestamp'] <= pd.to_datetime(filter_end_date)) &
+            (df['comment_timestamp'] >= pd.to_datetime(filter_start_date)) &
+            (df['comment_timestamp'] <= pd.to_datetime(filter_end_date)) &
             (df['platform'].isin(filter_platform))
         ]
         configure_entity_page_second_half(filtered_df)
@@ -162,7 +164,7 @@ def get_sentiment_aggregated_at_aspect_level(df):
 
 
 
-def create_aspect_column_figure(side, trump_aspect_sentiment_count_df, trump_aspect_sentiment_row_perc_df, entity_name):
+def create_aspect_column_figure(side, aspect_sentiment_count_df, aspect_sentiment_row_perc_df, entity_name):
     def create_aspect_level_figure(side, df, plot_type, plot_key, y='aspect', color='sentiment'):
         if plot_type == 'counts':
             word = 'Volume'
@@ -179,12 +181,12 @@ def create_aspect_column_figure(side, trump_aspect_sentiment_count_df, trump_asp
 
     side.markdown(f"<h3 style='text-align: center;'>{entity_name}</h3>", unsafe_allow_html=True)
     create_aspect_level_figure(side=side,
-                                df=trump_aspect_sentiment_count_df, 
+                                df=aspect_sentiment_count_df, 
                                 plot_type='counts',
                                 plot_key='counts'+entity_name)
     
     create_aspect_level_figure(side=side,
-                                df=trump_aspect_sentiment_row_perc_df, 
+                                df=aspect_sentiment_row_perc_df, 
                                 plot_type='percentage',
                                 plot_key='percentage'+entity_name)
 
@@ -215,8 +217,8 @@ def configure_aspect_page(df, start, end):
     if filter_left.button('Apply Filters'):
 
         filtered_df = df[
-            (df['post_timestamp'] >= pd.to_datetime(filter_start_date)) &
-            (df['post_timestamp'] <= pd.to_datetime(filter_end_date)) &
+            (df['comment_timestamp'] >= pd.to_datetime(filter_start_date)) &
+            (df['comment_timestamp'] <= pd.to_datetime(filter_end_date)) &
             (df['platform'].isin(filter_platform)) & 
             (df['final_aspect_categories'].isin(filter_aspect)) 
         ]
@@ -229,18 +231,204 @@ def configure_aspect_page(df, start, end):
 
 
 
+# TIME SERIES
+def get_sentiment_aggregated_at_timeviz_level(df):
+    def get_timeviz_level_sentiment_counts(df):
+        # result = pd.DataFrame(df.groupby(['comment_timestamp', 'comment_id']).final_sentiment_prediction.mean().apply(lambda x: 'positive' if x > 0 else 'negative' if x < 0 else 'neutral'))
+        result = pd.DataFrame(df.groupby(['comment_timestamp_week_sun', 'comment_id']).final_sentiment_prediction.mean().apply(lambda x: 'positive' if x > 0 else 'negative' if x < 0 else 'neutral'))
+        result = result.reset_index().rename(columns={'final_sentiment_prediction': 'sentiment', 'final_aspect_categories': 'aspect', 'comment_timestamp_week_sun': 'comment_date', 'comment_timestamp': 'comment_date'})
+        result = result.groupby(['comment_date', 'sentiment']).size().reset_index(name='count')
+        result['percentage'] = result.groupby('comment_date')['count'].apply(lambda x: 100 * x / x.sum()).values
+        result = result[result['comment_date'] <= pd.to_datetime(END_DATE_DEFAULT)]
+        return result
+
+    def get_timeviz_level_aspect_counts(df):
+        result = pd.pivot_table(df, index='comment_timestamp_week_sun', columns='final_aspect_categories', aggfunc='count')['comment'].reset_index().fillna(0)
+        result = result.rename(columns={'final_sentiment_prediction': 'sentiment', 'final_aspect_categories': 'aspect', 'comment_timestamp_week_sun': 'comment_date', 'comment_timestamp': 'comment_date'})
+        result = result[result['comment_date'] <= pd.to_datetime(END_DATE_DEFAULT)]
+        
+        result = pd.melt(result, 
+                     id_vars=['comment_date'], 
+                     var_name='aspect', 
+                     value_name='value')
+        
+        result['percentage'] = (result['value'] / result.groupby('comment_date')['value'].transform('sum')) * 100
+        result = result.rename(columns={'value':'count'})
+        return result
+    
+
+    trump_df = df[df.entity_category == 'trump']
+    kamala_df = df[df.entity_category == 'kamala']
+
+    trump_timeviz_sentiment_count_df = get_timeviz_level_sentiment_counts(trump_df)
+    kamala_timeviz_sentiment_count_df = get_timeviz_level_sentiment_counts(kamala_df)
+
+    trump_timeviz_aspect_count_df = get_timeviz_level_aspect_counts(trump_df)
+    kamala_timeviz_aspect_count_df = get_timeviz_level_aspect_counts(kamala_df)
+
+    return (trump_timeviz_sentiment_count_df, kamala_timeviz_sentiment_count_df, trump_timeviz_aspect_count_df, kamala_timeviz_aspect_count_df)
+
+
+def create_timeviz_column_figure(side, timeviz_sentiment_count_df, timeviz_aspect_count_df,  entity_name):
+    def create_timeviz_level_figure(side, df, plot_key):
+        fig = px.bar(df, 
+                        x='comment_date', 
+                        y='percentage', 
+                        color='sentiment', 
+                        title="Distribution of Sentiment Over Time",
+                        labels={'percentage': 'Percentage', 'count': 'Count'},
+                        hover_data={'count': True}, 
+                        color_discrete_map={'negative': 'red', 'neutral': 'lightgray', 'positive': 'green'}
+                        )
+        side.plotly_chart(fig, use_container_width=True, key=plot_key)
+
+    def create_timeviz_level_figure2(side, df, plot_key):
+        fig = px.bar(df, 
+                        x='comment_date', 
+                        y='percentage', 
+                        color='aspect', 
+                        title="Distribution of Aspect Over Time",
+                        labels={'percentage': 'Percentage', 'count': 'Count'},
+                        hover_data={'count': True}, 
+                        color_discrete_map={'negative': 'red', 'neutral': 'lightgray', 'positive': 'green'}
+                        )
+        side.plotly_chart(fig, use_container_width=True, key=plot_key)
+
+    side.markdown(f"<h3 style='text-align: center;'>{entity_name}</h3>", unsafe_allow_html=True)
+    create_timeviz_level_figure(side=side,
+                                df=timeviz_sentiment_count_df, 
+                                plot_key='timeviz_sentiment_perc'+entity_name)
+    create_timeviz_level_figure2(side=side,
+                                df=timeviz_aspect_count_df, 
+                                plot_key='timeviz_aspect_perc'+entity_name)
+
+def configure_timeviz_page(df, start, end):
+    def configure_timesries_page_second_half(df):
+        trump_timeviz_sentiment_count_df, kamala_timeviz_sentiment_count_df, trump_timeviz_aspect_count_df, kamala_timeviz_aspect_count_df = get_sentiment_aggregated_at_timeviz_level(df)
+        left, _, right = st.columns([3, 1, 3])
+
+        create_timeviz_column_figure(left, trump_timeviz_sentiment_count_df, trump_timeviz_aspect_count_df, 'Trump')
+        create_timeviz_column_figure(right, kamala_timeviz_sentiment_count_df, kamala_timeviz_aspect_count_df,  'Kamala')
+
+
+
+    # st.markdown('<h2 style="text-align: center;">Over Time Visualization of ABSA Results</h2>', unsafe_allow_html=True)
+    st.markdown('<h2>Over Time Visualization of ABSA Results</h2>', unsafe_allow_html=True)
+    st.write('Data presented in the below charts are on the comment-aspect level (i.e. aggregated sentiments to unique aspects for comments)')
+    st.header("Filters")
+    
+    
+
+    filter_left, filter_right = st.columns(2)
+
+    filter_platform = filter_left.multiselect("Social Media Platform", 
+                                     options=PLATFORM_OPTIONS, 
+                                     key="filter_category_platform_timeseries_level")
+    filter_aspect = filter_right.multiselect("Aspect", 
+                                    options=ASPECT_OPTIONS,
+                                    key="filter_aspect_timeseries_level")
+    if not filter_aspect:
+        filter_aspect = ASPECT_OPTIONS
+    if not filter_platform:
+        filter_platform = PLATFORM_OPTIONS
+
+    filter_start_date = filter_left.date_input("Start Date", value=start, key="filter_start_date_timeseries_level",  min_value=START_DATE_DEFAULT, max_value=END_DATE_DEFAULT)
+    filter_end_date = filter_right.date_input("End Date", value=end, key="filter_end_date_timeseries_level",  min_value=START_DATE_DEFAULT, max_value=END_DATE_DEFAULT)
+    
+    if filter_left.button('Apply Filters'):
+
+        filtered_df = df[
+            (df['comment_timestamp'] >= pd.to_datetime(filter_start_date)) &
+            (df['comment_timestamp'] <= pd.to_datetime(filter_end_date)) &
+            (df['platform'].isin(filter_platform)) & 
+            (df['final_aspect_categories'].isin(filter_aspect))
+        ]
+
+        configure_timesries_page_second_half(filtered_df)
+        
+
+    else:
+        configure_timesries_page_second_half(df)
+        pass
+
+
+# View sample:
+def configure_view_sample_page(df, start, end):
+    st.markdown('<h2>Sample Text with Filters</h2>', unsafe_allow_html=True)
+    st.write('On this page, you may use filters to sample 1000 records. The sampling of records are random')
+    st.header("Filters")
+    filter_left, filter_right = st.columns(2)
+
+    filter_aspect = filter_left.multiselect("Aspect", 
+                                    options=ASPECT_OPTIONS,
+                                    key="filter_aspect_samplepage")
+    filter_platform = filter_right.multiselect("Social Media Platform", options=PLATFORM_OPTIONS, key="filter_category_samplepage")
+    if not filter_platform:
+        filter_platform = PLATFORM_OPTIONS
+    if not filter_aspect:
+        filter_aspect = ASPECT_OPTIONS
+
+    filter_start_date = filter_left.date_input("Start Date", value=start, key="filter_start_date_samplepage",  min_value=START_DATE_DEFAULT, max_value=END_DATE_DEFAULT)
+    filter_end_date = filter_right.date_input("End Date", value=end, key="filter_end_date_samplepage",  min_value=START_DATE_DEFAULT, max_value=END_DATE_DEFAULT)
+    
+    
+    if filter_left.button('Apply Filters'):
+
+        filtered_df = df[
+            (df['comment_timestamp'] >= pd.to_datetime(filter_start_date)) &
+            (df['comment_timestamp'] <= pd.to_datetime(filter_end_date)) &
+            (df['platform'].isin(filter_platform)) & 
+            (df['final_aspect_categories'].isin(filter_aspect)) 
+        ]
+
+        sampled_df = filtered_df[['platform', 'comment_timestamp', 'sentence', 'entity_category', 'final_aspect_categories']]
+        sampled_df['comment_timestamp'] = sampled_df['comment_timestamp'].dt.strftime('%Y-%m-%d')
+        sampled_df['entity_category'] = sampled_df['entity_category'].str.title()
+        sampled_df['final_aspect_categories'] = sampled_df['final_aspect_categories'].str.title()
+        sampled_df = sampled_df.rename(columns={
+            'platform':'Social Media Platform', 
+            'comment_timestamp': 'Comment Date',
+            'sentence': 'Sentence',
+            'entity_category': 'Entity',
+            'final_aspect_categories' : 'Aspect'
+        })
+        st.dataframe(sampled_df.sample(1000).reset_index(drop=True), use_container_width=True)
+        
+
+    else:
+        sampled_df = df[['platform', 'comment_timestamp', 'sentence', 'entity_category', 'final_aspect_categories']]
+        sampled_df['comment_timestamp'] = sampled_df['comment_timestamp'].dt.strftime('%Y-%m-%d')
+        sampled_df['entity_category'] = sampled_df['entity_category'].str.title()
+        sampled_df['final_aspect_categories'] = sampled_df['final_aspect_categories'].str.title()
+        sampled_df = sampled_df.rename(columns={
+            'platform':'Social Media Platform', 
+            'comment_timestamp': 'Comment Date',
+            'sentence': 'Sentence',
+            'entity_category': 'Entity',
+            'final_aspect_categories' : 'Aspect'
+        })
+        st.dataframe(sampled_df.sample(1000).reset_index(drop=True), use_container_width=True)
+
+
+
+
+
 # COMMON UI 
 def configure_sidebar(df):
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("## Select a page:", ("Entity Level", "Aspect Level"))
+    page = st.sidebar.radio("## View a page:", ("Entity Level", "Aspect Level", "Over Time Visualization", "View Sample Text"))
     
     st.markdown('<h1 style="text-align: center;"> ABSA of US Elections 2024</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center;">This analysis is based on static data scraped from top posts between 18 Aug 24 and 15 Sep 25.<p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center;">This analysis is based on static data scraped from top posts between 22 Jul 24 and 15 Sep 24.<p>', unsafe_allow_html=True)
 
     if page == "Entity Level":
         configure_overall_entity_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
     elif page == "Aspect Level":
         configure_aspect_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
+    elif page == "Over Time Visualization":
+        configure_timeviz_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
+    elif page == "View Sample Text":
+        configure_view_sample_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
 # # # Optionally, display specific aspects or sentiment scores
 # aspect = st.selectbox('Select Aspect', df['final_aspect_categories'].unique())
 # filtered_data = df[df['final_aspect_categories'] == aspect]
@@ -250,15 +438,17 @@ def configure_sidebar(df):
 if __name__ == '__main__':
     st.set_page_config(layout="wide")
     ORIGINAL_DF = get_data()
-    START_DATE_DEFAULT = datetime.date(2024, 8, 18)
+    START_DATE_DEFAULT = datetime.date(2024, 7, 22)
     END_DATE_DEFAULT = datetime.date(2024, 9, 15)
     ASPECT_OPTIONS = ['campaign', 'communication', 'competence', 'controversies',
                         'ethics and integrity', 'leadership', 'personality trait', 'policies',
                         'political ideology', 'public image', 'public service record',
                         'relationships and alliances', 'voter sentiment', 'others']
     PLATFORM_OPTIONS = ['Reddit', 'Youtube']
+    ENTITY_OPTIONS = ['Trump', 'Kamala']
     configure_sidebar(ORIGINAL_DF)
 
 
 
 
+df = get_data()
