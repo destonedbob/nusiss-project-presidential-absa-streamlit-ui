@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification, Auto
                         AutoModelForSeq2SeqLM, AutoConfig, pipeline
 from model.prediction import MultiLabelClassifier, AspectBasedSentimentModel, predict_with_models
 import torch
-
+import os
 
 # DATA
 @st.cache_data
@@ -37,6 +37,8 @@ def get_models():
     tokenizer = AutoTokenizer.from_pretrained(ENTITY_MODEL)
 
     model = MultiLabelClassifier(num_labels=13)
+    print(ASPECT_MODEL_DISTIL)
+    print(os.listdir())
     model.load_state_dict(torch.load(ASPECT_MODEL_DISTIL))
     tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_BASE_CASED)
 
