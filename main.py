@@ -9,6 +9,8 @@ from model.prediction import MultiLabelClassifier, AspectBasedSentimentModel, pr
 import torch
 import os
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # DATA
 @st.cache_data
 def get_data():
@@ -39,14 +41,14 @@ def get_models():
     model = MultiLabelClassifier(num_labels=13)
     print(ASPECT_MODEL_DISTIL)
     print(os.listdir())
-    model.load_state_dict(torch.load(ASPECT_MODEL_DISTIL))
+    model.load_state_dict(torch.load(ASPECT_MODEL_DISTIL, map_location=torch.device(device)))
     tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_BASE_CASED)
 
     model = AutoModelForSequenceClassification.from_pretrained(ASPECT_MODEL_SEQ2SEQ)
     tokenizer = AutoTokenizer.from_pretrained(ASPECT_MODEL_SEQ2SEQ)
 
     # Sentiment Model 1
-    model = torch.load(SENTIMENT_MODEL_DISTIL)
+    model = torch.load(SENTIMENT_MODEL_DISTIL, map_location=torch.device(device))
     tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_BASE_CASED)
 
     model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL_SEQ2SEQ)
