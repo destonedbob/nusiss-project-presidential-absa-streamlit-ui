@@ -27,9 +27,9 @@ def get_data():
 @st.cache_resource
 def get_models():
     ENTITY_MODEL = 'destonedbob/nusiss-election-project-entity-model-distilbert-base-cased'
-    ASPECT_MODEL_DISTIL = './model/multilabel_aspect_distil_4epochs_lr3e-5_without_test_set_split_keep_same_sent_together.pth'
+    ASPECT_MODEL_DISTIL = '/mount/src/nusiss-project-presidential-absa-streamlit-ui/model/multilabel_aspect_distil_4epochs_lr3e-5_without_test_set_split_keep_same_sent_together.pth'
     ASPECT_MODEL_SEQ2SEQ = 'destonedbob/nusiss-election-project-aspect-seq2seq-model-facebook-bart-large'
-    SENTIMENT_MODEL_DISTIL = './model/sentiment_model_val_acc_6162_lr4.5e-5_wtdecay_1e-4_epochs4_256_256_256_256_smoothed_weight_warmup_and_reducelr_freeze4layers.pth'
+    SENTIMENT_MODEL_DISTIL = '/mount/src/nusiss-project-presidential-absa-streamlit-ui/model/sentiment_model_val_acc_6162_lr4.5e-5_wtdecay_1e-4_epochs4_256_256_256_256_smoothed_weight_warmup_and_reducelr_freeze4layers.pth'
     SENTIMENT_MODEL_SEQ2SEQ = 'destonedbob/nusiss-election-project-sentiment-seq2seq-model-facebook-bart-large'
     DISTILBERT_BASE_CASED = 'distilbert-base-cased'
 
