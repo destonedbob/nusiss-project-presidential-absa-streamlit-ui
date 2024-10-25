@@ -408,7 +408,7 @@ def predict_with_models(df):
     # torch.save(model, 'sentiment_model_val_acc_6162_lr4.5e-5_wtdecay_1e-4_epochs4_256_256_256_256_warmup_and_reducelr.pth')
         
     model = AspectBasedSentimentModel(DISTILBERT_BASE_CASED)
-    model.load(SENTIMENT_MODEL_DISTIL, map_location=torch.device(device))
+    model.load_state_dict(torch.load(SENTIMENT_MODEL_DISTIL, map_location=torch.device(device)))
     model.to(device)
 
     result['distil_sentiment_prediction_and_confidence_score'] = result.apply(lambda x: predict_sentiment_distil(x, tokenizer, model, return_both=True), axis=1)
