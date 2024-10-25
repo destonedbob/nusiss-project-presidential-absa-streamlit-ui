@@ -32,7 +32,7 @@ class AspectBasedSentimentModel(nn.Module):
         super(AspectBasedSentimentModel, self).__init__()
 
         num_extra_dims = 2
-        self.config = AutoConfig.from_pretrained(pretrained_model_name)
+        self.config = AutoConfig.from_pretrained(pretrained_model_name, use_flash_attention=False))
         self.bert = AutoModel.from_pretrained(pretrained_model_name, config=self.config)
 
         for param in self.bert.transformer.layer[:4].parameters():  # Freeze first 4 layers
