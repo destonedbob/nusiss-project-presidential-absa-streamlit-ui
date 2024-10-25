@@ -3,11 +3,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.express as px
 import datetime
-
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel, \
+                        AutoModelForSeq2SeqLM, AutoConfig, pipeline
+from model.prediction import MultiLabelClassifier, AspectBasedSentimentModel, predict_with_models
+import torch
 
 
 # DATA
-
 @st.cache_data
 def get_data():
     df = pd.DataFrame()
@@ -21,6 +23,33 @@ def get_data():
     df['comment_timestamp_week_sun'] = df['comment_timestamp'] + pd.offsets.Week(weekday=6)
 
     return df
+
+@st.cache_resource
+def get_models():
+    ENTITY_MODEL = 'destonedbob/nusiss-election-project-entity-model-distilbert-base-cased'
+    ASPECT_MODEL_DISTIL = './model/multilabel_aspect_distil_4epochs_lr3e-5_without_test_set_split_keep_same_sent_together.pth'
+    ASPECT_MODEL_SEQ2SEQ = 'destonedbob/nusiss-election-project-aspect-seq2seq-model-facebook-bart-large'
+    SENTIMENT_MODEL_DISTIL = './model/sentiment_model_val_acc_6162_lr4.5e-5_wtdecay_1e-4_epochs4_256_256_256_256_smoothed_weight_warmup_and_reducelr_freeze4layers.pth'
+    SENTIMENT_MODEL_SEQ2SEQ = 'destonedbob/nusiss-election-project-sentiment-seq2seq-model-facebook-bart-large'
+    DISTILBERT_BASE_CASED = 'distilbert-base-cased'
+
+    model = AutoModelForSequenceClassification.from_pretrained(ENTITY_MODEL)
+    tokenizer = AutoTokenizer.from_pretrained(ENTITY_MODEL)
+
+    model = MultiLabelClassifier(num_labels=13)
+    model.load_state_dict(torch.load(ASPECT_MODEL_DISTIL))
+    tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_BASE_CASED)
+
+    model = AutoModelForSequenceClassification.from_pretrained(ASPECT_MODEL_SEQ2SEQ)
+    tokenizer = AutoTokenizer.from_pretrained(ASPECT_MODEL_SEQ2SEQ)
+
+    # Sentiment Model 1
+    model = torch.load(SENTIMENT_MODEL_DISTIL)
+    tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_BASE_CASED)
+
+    model = AutoModelForSequenceClassification.from_pretrained(SENTIMENT_MODEL_SEQ2SEQ)
+    tokenizer = AutoTokenizer.from_pretrained(SENTIMENT_MODEL_SEQ2SEQ)
+
 
 # ENTITY LEVEL
 
@@ -410,13 +439,100 @@ def configure_view_sample_page(df, start, end):
         st.dataframe(sampled_df.sample(1000).reset_index(drop=True), use_container_width=True)
 
 
+# Model Page
+def configure_try_model_page():
+    def get_model_result(model_type, sentence):
+        if model_type == "Entire Pipeline":
+            sentence_df = pd.DataFrame([sentence], columns=['sentence'])
+            result = predict_with_models(sentence_df)
+
+
+        if model_type in ["Entire Pipeline", "Entity Model", "Aspect Model (DistilBert)",  "Aspect Model (Seq2Seq)", 
+                            "Aspect Model (Combined)", "Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
+                            "Sentiment Model (Combined)"]:
+            NotImplementedError('Entity Model')
+        
+        if model_type == "Entire Pipeline":
+            return result
+        
+        if model_type in ["Aspect Model (DistilBert)", "Aspect Model (Combined)"]:
+            NotImplementedError('Aspect Model (DistilBert)')
+        
+        if model_type in ["Aspect Model (Seq2Seq)", "Aspect Model (Combined)"]:
+            NotImplementedError("Aspect Model (Seq2Seq)")
+
+        if model_type == "Aspect Model (Combined)":
+            NotImplementedError("Aspect Model (Combined)")
+        
+        if model_type in ["Aspect Model (DistilBert)",  "Aspect Model (Seq2Seq)", 
+                            "Aspect Model (Combined)"]:
+            return result
+        
+        if model_type in ["Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
+                            "Sentiment Model (Combined)"]:
+            NotImplementedError('Sentiment Model (DistilBert)')
+        
+        if model_type in ["Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
+                            "Sentiment Model (Combined)"]:
+            NotImplementedError("Sentiment Model (Seq2Seq)")
+
+        if model_type == "Sentiment Model (Combined)":
+            NotImplementedError("Sentiment Model (Combined)")
+        
+        if model_type in ["Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
+                            "Sentiment Model (Combined)"]:
+            return result
+        # Code for Aspect model combine
+
+    model_type = st.selectbox(
+        "Choose a model to try out:", 
+        ["Entire Pipeline", "Entity Model", "Aspect Model (DistilBert)",  "Aspect Model (Seq2Seq)", 
+        "Aspect Model (Combined)", "Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", "Sentiment Model (Combined)"]
+    )
+
+    # Text input for entering a sentence
+    st.session_state.input_text = ""
+    st.session_state.input_text = st.text_input("Enter a sentence:")
+
+    # Submit button
+    if st.button("Run Model") and st.session_state.input_text != '':
+        with st.spinner(text='Predicting...'):
+            result = get_model_result(model_type, st.session_state.input_text)
+        
+        
+        st.write('<h4>Model chosen</h4>', unsafe_allow_html=True)
+        st.write(f"{model_type}")
+        st.write('<h4>Input sentence:</h4>', unsafe_allow_html=True)
+        st.write(f"{st.session_state.input_text}")
+        st.write('<h4>Outputs</h4>', unsafe_allow_html=True)
+        st.write('<h4>Entity</h4>', unsafe_allow_html=True)
+        st.write(f"{'; '.join([word.title() for word in list(set(result['entity_category'].values.tolist()))])}")
+        if 'final_aspect_categories' in result.columns:
+            aspect_result = ''
+            for idx, row in result.iterrows():
+                if idx > 0:
+                    aspect_result += '; '
+                aspect_result += row['entity_category'] + ' - ' + row['final_aspect_categories']
+            st.write('<h4>Aspect</h4>', unsafe_allow_html=True)
+            st.write(f"{aspect_result.title()}")
+
+        if 'final_sentiment_prediction' in result.columns:
+            sentiment_result = ''
+            for idx, row in result.iterrows():
+                if idx > 0:
+                    sentiment_result += '; '
+                sentiment_result += row['entity_category'] + ' - ' + row['final_aspect_categories'] + ' - ' + IDX_SENTIMENT_MAP[row['final_sentiment_prediction']]
+            st.write('<h4>Sentiment</h4>', unsafe_allow_html=True)
+            st.write(f"{sentiment_result.title()}")
+            
+
 
 
 
 # COMMON UI 
 def configure_sidebar(df):
     st.sidebar.title("Navigation")
-    page = st.sidebar.radio("## View a page:", ("Entity Level", "Aspect Level", "Over Time Visualization", "View Sample Text"))
+    page = st.sidebar.radio("## View a page:", ("Entity Level", "Aspect Level", "Over Time Visualization", "Try out models", "View Sample Data"))
     
     st.markdown('<h1 style="text-align: center;"> ABSA of US Elections 2024</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center;">This analysis is based on static data scraped from top posts between 22 Jul 24 and 15 Sep 24.<p>', unsafe_allow_html=True)
@@ -427,8 +543,11 @@ def configure_sidebar(df):
         configure_aspect_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
     elif page == "Over Time Visualization":
         configure_timeviz_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
-    elif page == "View Sample Text":
+    elif page == "View Sample Data":
         configure_view_sample_page(df, START_DATE_DEFAULT, END_DATE_DEFAULT)
+    elif page == "Try out models":
+        configure_try_model_page()
+
 # # # Optionally, display specific aspects or sentiment scores
 # aspect = st.selectbox('Select Aspect', df['final_aspect_categories'].unique())
 # filtered_data = df[df['final_aspect_categories'] == aspect]
@@ -437,6 +556,10 @@ def configure_sidebar(df):
 
 if __name__ == '__main__':
     st.set_page_config(layout="wide")
+    with st.spinner(text="Downloading Models...May take up to 10 minutes"):
+        get_models()
+    print(f'Cuda is available: {torch.cuda.is_available()}')
+    IDX_SENTIMENT_MAP = {-1: 'Negative', 0: 'Neutral', 1:'Positive'}
     ORIGINAL_DF = get_data()
     START_DATE_DEFAULT = datetime.date(2024, 7, 22)
     END_DATE_DEFAULT = datetime.date(2024, 9, 15)
