@@ -407,7 +407,7 @@ def predict_with_models(df):
     tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_BASE_CASED)
     # torch.save(model, 'sentiment_model_val_acc_6162_lr4.5e-5_wtdecay_1e-4_epochs4_256_256_256_256_warmup_and_reducelr.pth')
         
-    model = AspectBasedSentimentModel()
+    model = AspectBasedSentimentModel(DISTILBERT_BASE_CASED)
     model.load(SENTIMENT_MODEL_DISTIL, map_location=torch.device(device))
     model.to(device)
 
