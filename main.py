@@ -445,54 +445,9 @@ def configure_view_sample_page(df, start, end):
 
 # Model Page
 def configure_try_model_page():
-    def get_model_result(model_type, sentence):
-        if model_type == "Entire Pipeline":
-            sentence_df = pd.DataFrame([sentence], columns=['sentence'])
-            result = predict_with_models(sentence_df)
-
-
-        if model_type in ["Entire Pipeline", "Entity Model", "Aspect Model (DistilBert)",  "Aspect Model (Seq2Seq)", 
-                            "Aspect Model (Combined)", "Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
-                            "Sentiment Model (Combined)"]:
-            NotImplementedError('Entity Model')
-        
-        if model_type == "Entire Pipeline":
-            return result
-        
-        if model_type in ["Aspect Model (DistilBert)", "Aspect Model (Combined)"]:
-            NotImplementedError('Aspect Model (DistilBert)')
-        
-        if model_type in ["Aspect Model (Seq2Seq)", "Aspect Model (Combined)"]:
-            NotImplementedError("Aspect Model (Seq2Seq)")
-
-        if model_type == "Aspect Model (Combined)":
-            NotImplementedError("Aspect Model (Combined)")
-        
-        if model_type in ["Aspect Model (DistilBert)",  "Aspect Model (Seq2Seq)", 
-                            "Aspect Model (Combined)"]:
-            return result
-        
-        if model_type in ["Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
-                            "Sentiment Model (Combined)"]:
-            NotImplementedError('Sentiment Model (DistilBert)')
-        
-        if model_type in ["Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
-                            "Sentiment Model (Combined)"]:
-            NotImplementedError("Sentiment Model (Seq2Seq)")
-
-        if model_type == "Sentiment Model (Combined)":
-            NotImplementedError("Sentiment Model (Combined)")
-        
-        if model_type in ["Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", 
-                            "Sentiment Model (Combined)"]:
-            return result
-        # Code for Aspect model combine
-
-    model_type = st.selectbox(
-        "Choose a model to try out:", 
-        ["Entire Pipeline", "Entity Model", "Aspect Model (DistilBert)",  "Aspect Model (Seq2Seq)", 
-        "Aspect Model (Combined)", "Sentiment Model (DistilBert)", "Sentiment Model (Seq2Seq)", "Sentiment Model (Combined)"]
-    )
+    def get_model_result(sentence):
+        sentence_df = pd.DataFrame([sentence], columns=['sentence'])
+        result = predict_with_models(sentence_df)
 
     # Text input for entering a sentence
     st.session_state.input_text = ""
@@ -501,11 +456,11 @@ def configure_try_model_page():
     # Submit button
     if st.button("Run Model") and st.session_state.input_text != '':
         with st.spinner(text='Predicting...'):
-            result = get_model_result(model_type, st.session_state.input_text)
+            result = get_model_result(st.session_state.input_text)
         
-        
+        st.write('<h2> OUT OF ORDER </h2>', unsafe_allow_html=True)
+        st.write('<p>Model does not work on cloud because we deployed to streamlit free. It does not have sufficient computational power. <br><br>If you want to try the model, please visit either of these repositories, clone and run the repos locally instead. <a herf="https://github.com/destonedbob/nusiss-project-presidential-absa-system/tree/main">[1]</a> <a herf="https://github.com/destonedbob/nusiss-project-presidential-absa-streamlit-ui">[2]</a> </p>')
         st.write('<h4>Model chosen</h4>', unsafe_allow_html=True)
-        st.write(f"{model_type}")
         st.write('<h4>Input sentence:</h4>', unsafe_allow_html=True)
         st.write(f"{st.session_state.input_text}")
         st.write('<h4>Outputs</h4>', unsafe_allow_html=True)
@@ -528,7 +483,6 @@ def configure_try_model_page():
                 sentiment_result += row['entity_category'] + ' - ' + row['final_aspect_categories'] + ' - ' + IDX_SENTIMENT_MAP[row['final_sentiment_prediction']]
             st.write('<h4>Sentiment</h4>', unsafe_allow_html=True)
             st.write(f"{sentiment_result.title()}")
-            
 
 
 
