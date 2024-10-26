@@ -450,6 +450,8 @@ def configure_try_model_page():
         result = predict_with_models(sentence_df)
 
     # Text input for entering a sentence
+    st.write('<h2> OUT OF ORDER </h2>', unsafe_allow_html=True)
+    st.write('<p>Model does not work on cloud because we deployed to streamlit free. It does not have sufficient computational power. <br><br>If you want to try the model, please visit either of these repositories, clone and run the repos locally instead. <a herf="https://github.com/destonedbob/nusiss-project-presidential-absa-system/tree/main">[1]</a> <a herf="https://github.com/destonedbob/nusiss-project-presidential-absa-streamlit-ui">[2]</a> </p>')
     st.session_state.input_text = ""
     st.session_state.input_text = st.text_input("Enter a sentence:")
 
@@ -458,8 +460,6 @@ def configure_try_model_page():
         with st.spinner(text='Predicting...'):
             result = get_model_result(st.session_state.input_text)
         
-        st.write('<h2> OUT OF ORDER </h2>', unsafe_allow_html=True)
-        st.write('<p>Model does not work on cloud because we deployed to streamlit free. It does not have sufficient computational power. <br><br>If you want to try the model, please visit either of these repositories, clone and run the repos locally instead. <a herf="https://github.com/destonedbob/nusiss-project-presidential-absa-system/tree/main">[1]</a> <a herf="https://github.com/destonedbob/nusiss-project-presidential-absa-streamlit-ui">[2]</a> </p>')
         st.write('<h4>Model chosen</h4>', unsafe_allow_html=True)
         st.write('<h4>Input sentence:</h4>', unsafe_allow_html=True)
         st.write(f"{st.session_state.input_text}")
